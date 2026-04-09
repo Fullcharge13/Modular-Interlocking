@@ -30,8 +30,17 @@ const EXEMPT_PATTERNS = [
   /migrations?\//,
 ];
 
+/**
+ * Windows/Unix 양쪽에서 올바르게 동작하도록
+ * 경로 구분자를 슬래시로 정규화한다.
+ */
+function normalisePath(p) {
+  return p.replace(/\\/g, "/");
+}
+
 function isExempt(filePath) {
-  return EXEMPT_PATTERNS.some((p) => p.test(filePath));
+  const normalised = normalisePath(filePath);
+  return EXEMPT_PATTERNS.some((p) => p.test(normalised));
 }
 
 function findTestFile(srcPath) {

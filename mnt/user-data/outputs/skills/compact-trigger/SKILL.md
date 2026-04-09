@@ -137,8 +137,8 @@ CAN_REMOVE = [
 ## 연계
 
 ```
-context-sentinel (50% 경고)
+context-watch (50% 경고)
     → compact-trigger (시점 판단)
         → /compact 실행
-            → context-sentinel (재시작, 20%로 리셋)
+            → context-watch (재시작, 20%로 리셋)
 ```

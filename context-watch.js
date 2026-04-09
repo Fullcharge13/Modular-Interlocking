@@ -18,8 +18,7 @@
  */
 
 const readline = require("readline");
-const fs = require("fs");
-const path = require("path");
+const { loadState, saveState } = require("./state-utils");
 
 // ─── 설정 ────────────────────────────────────────────────────────────────────
 
@@ -40,42 +39,12 @@ const CONFIG = {
     maxContext:   200000,   // Claude의 최대 컨텍스트 윈도우
   },
 
-  // 상태 파일 경로
-  stateFile: path.join(process.cwd(), ".gongpo", "context-state.json"),
-  checkpointDir: path.join(process.cwd(), ".gongpo", "checkpoints"),
-
   // TDD 보호 — 이 단계에서는 압축 개입 금지
   tddProtectedPhases: ["RED", "GREEN"],
+
+  // warningHistory 최대 보존 개수
+  maxWarningHistory: 50,
 };
-
-// ─── 상태 관리 ────────────────────────────────────────────────────────────────
-
-function loadState() {
-  try {
-    if (fs.existsSync(CONFIG.stateFile)) {
-      return JSON.parse(fs.readFileSync(CONFIG.stateFile, "utf8"));
-    }
-  } catch (_) {}
-
-  return {
-    turnCount: 0,
-    fileLoadsCount: 0,
-    largeOutputCount: 0,
-    estimatedTokens: 0,
-    lastCompactTurn: 0,
-    currentTddPhase: null,   // null | "RED" | "GREEN" | "REFACTOR"
-    sessionStartTime: new Date().toISOString(),
-    warningHistory: [],
-  };
-}
-
-function saveState(state) {
-  const dir = path.dirname(CONFIG.stateFile);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-  fs.writeFileSync(CONFIG.stateFile, JSON.stringify(state, null, 2));
-}
 
 // ─── 컨텍스트 사용량 추정 ─────────────────────────────────────────────────────
 
@@ -108,22 +77,31 @@ function estimateContextPct(state, event) {
 // ─── TDD 단계 감지 ────────────────────────────────────────────────────────────
 
 function detectTddPhase(event) {
-  const output = (event.tool_response?.output ?? "").toLowerCase();
-  const input  = JSON.stringify(event.tool_input ?? "").toLowerCase();
-  const combined = output + input;
+  // Bash 도구 출력에서만 TDD 단계를 감지한다.
+  // 다른 도구의 출력(git 오류 등)에서 오탐을 방지하기 위해
+  // pytest 특유의 패턴만 사용한다.
+  if (event.tool_name !== "Bash") return null;
 
-  if (combined.includes("failing") || combined.includes("assert") ||
-      combined.includes("error") || combined.includes("failed")) {
-    return "RED";
-  }
-  if (combined.includes("passed") || combined.includes("green") ||
-      combined.includes("all passed")) {
-    return "GREEN";
-  }
-  if (combined.includes("refactor") || combined.includes("ruff") ||
-      combined.includes("mypy")) {
-    return "REFACTOR";
-  }
+  const output = event.tool_response?.output ?? "";
+
+  // pytest가 실행된 출력인지 먼저 확인
+  const isPytest = output.includes("pytest") ||
+                   /\d+ (passed|failed|error)/.test(output) ||
+                   /PASSED|FAILED/.test(output);
+  if (!isPytest) return null;
+
+  // 구체적인 pytest 결과 패턴으로만 단계 판별
+  const allPassed = /\d+ passed/.test(output) &&
+                    !/\d+ failed/.test(output) &&
+                    !/\d+ error/.test(output);
+
+  const hasFailed = /\d+ failed/.test(output) || /FAILED.*::/.test(output);
+  const hasError  = /\d+ error/.test(output)  || /ERROR.*::/.test(output);
+
+  if (allPassed)              return "GREEN";
+  if (hasFailed || hasError)  return "RED";
+  if (/refactor|ruff|mypy/.test(output.toLowerCase())) return "REFACTOR";
+
   return null;
 }
 
@@ -196,7 +174,7 @@ async function main() {
     return;
   }
 
-  // 상태 로드
+  // 상태 로드 (공유 모듈 — 필드 누락 없이 병합)
   const state = loadState();
 
   // TDD 단계 갱신
@@ -218,7 +196,7 @@ async function main() {
   else if (pct >= thresholds.warning)  { level = "warning"; }
   else if (pct >= thresholds.caution)  { level = "caution"; }
 
-  // 상태 저장
+  // 경고 히스토리 기록 (최대 50개 유지)
   if (level) {
     state.warningHistory.push({
       turn: state.turnCount,
@@ -226,7 +204,11 @@ async function main() {
       level,
       time: new Date().toISOString(),
     });
+    if (state.warningHistory.length > CONFIG.maxWarningHistory) {
+      state.warningHistory.splice(0, 10);
+    }
   }
+
   saveState(state);
 
   // 출력

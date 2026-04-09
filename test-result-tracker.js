@@ -13,43 +13,22 @@
  */
 
 const readline = require("readline");
-const fs       = require("fs");
-const path     = require("path");
-
-const STATE_FILE = path.join(process.cwd(), ".gongpo", "context-state.json");
-
-function loadState() {
-  try {
-    if (fs.existsSync(STATE_FILE)) {
-      return JSON.parse(fs.readFileSync(STATE_FILE, "utf8"));
-    }
-  } catch (_) {}
-  return { currentTddPhase: null, lastTestResult: null };
-}
-
-function saveState(state) {
-  const dir = path.dirname(STATE_FILE);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2));
-}
+const { loadState, saveState } = require("./state-utils");
 
 function analyzePytestOutput(output) {
   if (!output) return null;
 
-  // pytest 실행 여부 확인
+  // pytest 실행 여부 확인 (구체적인 패턴으로 오탐 방지)
   const isPytest = output.includes("pytest") ||
-                   output.includes("PASSED") ||
-                   output.includes("FAILED") ||
-                   output.includes("ERROR") ||
-                   output.includes("passed") ||
-                   output.includes("failed");
+                   /\d+ (passed|failed|error)/.test(output) ||
+                   /PASSED.*::|FAILED.*::/.test(output);
 
   if (!isPytest) return null;
 
   // 결과 분류
   const allPassed = /\d+ passed/.test(output) && !/\d+ failed/.test(output) && !/\d+ error/.test(output);
-  const hasFailed = /\d+ failed/.test(output) || /FAILED/.test(output);
-  const hasError  = /\d+ error/.test(output)  || /ERROR/.test(output);
+  const hasFailed = /\d+ failed/.test(output) || /FAILED.*::/.test(output);
+  const hasError  = /\d+ error/.test(output)  || /ERROR.*::/.test(output);
 
   // 커버리지 추출
   const coverageMatch = output.match(/TOTAL\s+\d+\s+\d+\s+(\d+)%/);
@@ -83,6 +62,7 @@ async function main() {
   const result = analyzePytestOutput(output);
 
   if (result) {
+    // 공유 상태 로드 — 기존 필드(turnCount 등) 보존
     const state = loadState();
     const prevPhase = state.currentTddPhase;
     state.currentTddPhase = result.phase;

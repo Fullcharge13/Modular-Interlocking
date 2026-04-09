@@ -47,8 +47,6 @@ gongpo/
 │       └── testing.md                 # pytest 표준 (Given-When-Then)
 │
 ├── skills/                            # Layer 2: 주두 (복잡도 분산)
-│   ├── context-sentinel/
-│   │   └── SKILL.md                   # ★ 실시간 컨텍스트 상태 감시
 │   ├── compact-trigger/
 │   │   └── SKILL.md                   # ★ 압축 시점 능동 결정 + 체크포인트
 │   ├── python-tdd/
@@ -64,12 +62,12 @@ gongpo/
 │
 └── hooks/                             # Layer 4: 공포 완성 (이벤트 연결)
     ├── hooks.json                     # ★ 5개 이벤트 훅 설정
-    └── scripts/
-        ├── context-watch.js           # ★ PostToolUse: 실시간 컨텍스트 감시
-        ├── pre-edit-guard.js          # PreToolUse: Python 수정 전 TDD 확인
-        ├── test-result-tracker.js     # PostToolUse(Bash): pytest 결과 추적
-        ├── session-start.js           # SessionStart: 체크포인트 복원
-        └── session-end.js             # Stop: 체크포인트 자동 저장
+    ├── state-utils.js                 # 훅 간 공유 상태 유틸리티
+    ├── context-watch.js               # ★ PostToolUse: 실시간 컨텍스트 감시
+    ├── pre-edit-guard.js              # PreToolUse: Python 수정 전 TDD 확인
+    ├── test-result-tracker.js         # PostToolUse(Bash): pytest 결과 추적
+    ├── session-start.js               # SessionStart: 체크포인트 복원
+    └── session-end.js                 # Stop: 체크포인트 자동 저장
 ```
 
 ★ = 이 시스템의 핵심 신규 컴포넌트
@@ -116,15 +114,16 @@ REFACTOR → 동작 변경 없이 정리. 매 변경 후 전체 스위트 실행
 
 **원칙**: 도메인 지식을 skill 단위로 분산하여 에이전트가 최소 컨텍스트만 필요로 하게 한다.
 
-### `skills/context-sentinel/`
+### 실시간 컨텍스트 감시 — `context-watch.js` (훅)
 
-5개 발동 조건:
+컨텍스트 감시는 별도 skill이 아닌 `context-watch.js` 훅이 직접 처리합니다.
+PostToolUse 이벤트마다 자동 실행되며 5개 조건을 감지합니다:
 ```
-- 컨텍스트 40% 도달
-- 대화 15턴 초과
-- 파일 5개 이상 로드
-- 단일 응답 2,000 토큰 초과
-- 동일 컨텍스트 3회 이상 반복
+- 컨텍스트 40% 도달 (주의)
+- 대화 50% 도달 (경고 → compact-trigger)
+- 파일 다수 로드 (fileLoadsCount 누적)
+- 대용량 Bash 출력 (2,000자+ 응답)
+- 80% 도달 (차단)
 ```
 
 ### `skills/compact-trigger/`
@@ -200,10 +199,12 @@ cp -r skills/* ~/.claude/skills/
 mkdir -p ~/.claude/agents
 cp agents/*.md ~/.claude/agents/
 
-# 5. Hooks
-mkdir -p ~/.claude/hooks/scripts
-cp hooks/hooks.json ~/.claude/hooks/
-cp hooks/scripts/*.js ~/.claude/hooks/scripts/
+# 5. Hooks (스크립트는 루트에 위치)
+mkdir -p ~/.claude/hooks
+cp hooks.json ~/.claude/hooks/
+cp state-utils.js context-watch.js pre-edit-guard.js \
+   test-result-tracker.js session-start.js session-end.js \
+   ~/.claude/hooks/
 
 # 6. 체크포인트 디렉토리 초기화
 mkdir -p your-project/.gongpo/checkpoints
@@ -293,8 +294,6 @@ gongpo/
 │       └── testing.md                 # pytest standards (Given-When-Then)
 │
 ├── skills/                            # Layer 2: Judu (complexity distribution)
-│   ├── context-sentinel/
-│   │   └── SKILL.md                   # ★ Real-time context state monitoring
 │   ├── compact-trigger/
 │   │   └── SKILL.md                   # ★ Proactive compression decision + checkpoints
 │   ├── python-tdd/
@@ -310,12 +309,12 @@ gongpo/
 │
 └── hooks/                             # Layer 4: Gongpo (event-driven connection)
     ├── hooks.json                     # ★ 5 event hook configurations
-    └── scripts/
-        ├── context-watch.js           # ★ PostToolUse: real-time context monitoring
-        ├── pre-edit-guard.js          # PreToolUse: TDD check before Python edits
-        ├── test-result-tracker.js     # PostToolUse(Bash): pytest result tracking
-        ├── session-start.js           # SessionStart: checkpoint restore
-        └── session-end.js             # Stop: automatic checkpoint save
+    ├── state-utils.js                 # Shared state utility across hooks
+    ├── context-watch.js               # ★ PostToolUse: real-time context monitoring
+    ├── pre-edit-guard.js              # PreToolUse: TDD check before Python edits
+    ├── test-result-tracker.js         # PostToolUse(Bash): pytest result tracking
+    ├── session-start.js               # SessionStart: checkpoint restore
+    └── session-end.js                 # Stop: automatic checkpoint save
 ```
 
 ★ = Key new components of this system
@@ -362,15 +361,16 @@ REFACTOR → Clean up without changing behavior. Run full suite after every chan
 
 **Principle**: Distribute domain knowledge into skill units so agents need only minimal context.
 
-### `skills/context-sentinel/`
+### Real-time context monitoring — `context-watch.js` (hook)
 
-5 trigger conditions:
+Context monitoring is handled directly by the `context-watch.js` hook, not a separate skill.
+It fires on every PostToolUse event and detects 5 conditions:
 ```
-- Context reaches 40%
-- Conversation exceeds 15 turns
-- 5+ files loaded
-- Single response exceeds 2,000 tokens
-- Same context repeated 3+ times
+- Context reaches 40% (caution)
+- Context reaches 50% (warning → compact-trigger)
+- High file load count (accumulated fileLoadsCount)
+- Large Bash output (2,000+ char responses)
+- Context reaches 80% (block)
 ```
 
 ### `skills/compact-trigger/`
@@ -465,10 +465,12 @@ cp -r skills/* ~/.claude/skills/
 mkdir -p ~/.claude/agents
 cp agents/*.md ~/.claude/agents/
 
-# 5. Hooks
-mkdir -p ~/.claude/hooks/scripts
-cp hooks/hooks.json ~/.claude/hooks/
-cp hooks/scripts/*.js ~/.claude/hooks/scripts/
+# 5. Hooks (scripts live at repo root)
+mkdir -p ~/.claude/hooks
+cp hooks.json ~/.claude/hooks/
+cp state-utils.js context-watch.js pre-edit-guard.js \
+   test-result-tracker.js session-start.js session-end.js \
+   ~/.claude/hooks/
 
 # 6. Initialize checkpoint directory
 mkdir -p your-project/.gongpo/checkpoints

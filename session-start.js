@@ -15,31 +15,10 @@
 
 const fs   = require("fs");
 const path = require("path");
+const { resetState } = require("./state-utils");
 
 const CHECKPOINT_DIR = path.join(process.cwd(), ".gongpo", "checkpoints");
-const STATE_FILE     = path.join(process.cwd(), ".gongpo", "context-state.json");
 const LATEST         = path.join(CHECKPOINT_DIR, "latest.md");
-
-function resetContextState() {
-  const dir = path.dirname(STATE_FILE);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-
-  const freshState = {
-    turnCount:         0,
-    fileLoadsCount:    0,
-    largeOutputCount:  0,
-    estimatedTokens:   0,
-    lastCompactTurn:   0,
-    currentTddPhase:   null,
-    sessionStartTime:  new Date().toISOString(),
-    warningHistory:    [],
-  };
-
-  fs.writeFileSync(STATE_FILE, JSON.stringify(freshState, null, 2));
-  return freshState;
-}
 
 function loadLatestCheckpoint() {
   if (!fs.existsSync(LATEST)) return null;
@@ -97,18 +76,16 @@ function indent(text, prefix) {
 }
 
 function ensureGongpoDirs() {
-  for (const dir of [CHECKPOINT_DIR, path.dirname(STATE_FILE)]) {
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
+  if (!fs.existsSync(CHECKPOINT_DIR)) {
+    fs.mkdirSync(CHECKPOINT_DIR, { recursive: true });
   }
 }
 
 async function main() {
   ensureGongpoDirs();
 
-  // 새 세션마다 컨텍스트 상태 초기화
-  resetContextState();
+  // 새 세션마다 컨텍스트 상태 초기화 (공유 모듈 사용)
+  resetState();
 
   // 이전 체크포인트 확인
   const checkpoint = loadLatestCheckpoint();

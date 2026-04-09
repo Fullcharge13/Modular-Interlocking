@@ -7,7 +7,7 @@
       "hooks": [
         {
           "type": "command",
-          "command": "node hooks/scripts/pre-edit-guard.js",
+          "command": "node pre-edit-guard.js",
           "timeout": 5000
         }
       ]
@@ -19,7 +19,7 @@
       "hooks": [
         {
           "type": "command",
-          "command": "node hooks/scripts/context-watch.js",
+          "command": "node context-watch.js",
           "timeout": 5000
         }
       ]
@@ -31,7 +31,7 @@
       "hooks": [
         {
           "type": "command",
-          "command": "node hooks/scripts/test-result-tracker.js",
+          "command": "node test-result-tracker.js",
           "timeout": 5000
         }
       ]
@@ -42,7 +42,7 @@
       "hooks": [
         {
           "type": "command",
-          "command": "node hooks/scripts/session-start.js",
+          "command": "node session-start.js",
           "timeout": 10000
         }
       ]
@@ -53,7 +53,7 @@
       "hooks": [
         {
           "type": "command",
-          "command": "node hooks/scripts/session-end.js",
+          "command": "node session-end.js",
           "timeout": 10000
         }
       ]

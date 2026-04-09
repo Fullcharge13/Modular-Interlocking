@@ -13,23 +13,13 @@
  * stdout: { continue: true }
  */
 
-const fs   = require("fs");
-const path = require("path");
+const readline = require("readline");
+const fs       = require("fs");
+const path     = require("path");
+const { loadState } = require("./state-utils");
 
 const CHECKPOINT_DIR  = path.join(process.cwd(), ".gongpo", "checkpoints");
-const STATE_FILE      = path.join(process.cwd(), ".gongpo", "context-state.json");
 const LATEST_LINK     = path.join(CHECKPOINT_DIR, "latest.md");
-
-// ─── 상태 로드 ────────────────────────────────────────────────────────────────
-
-function loadState() {
-  try {
-    if (fs.existsSync(STATE_FILE)) {
-      return JSON.parse(fs.readFileSync(STATE_FILE, "utf8"));
-    }
-  } catch (_) {}
-  return null;
-}
 
 // ─── 체크포인트 생성 ──────────────────────────────────────────────────────────
 
@@ -93,7 +83,6 @@ TDD 단계: ${tddPhase}
 // ─── 메인 로직 ────────────────────────────────────────────────────────────────
 
 async function main() {
-  const readline = require("readline");
   const rl = readline.createInterface({ input: process.stdin });
   let raw = "";
   for await (const line of rl) { raw += line; }
