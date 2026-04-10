@@ -205,7 +205,7 @@ async function main() {
       time: new Date().toISOString(),
     });
     if (state.warningHistory.length > CONFIG.maxWarningHistory) {
-      state.warningHistory.splice(0, 10);
+      state.warningHistory = state.warningHistory.slice(-CONFIG.maxWarningHistory);
     }
   }
 

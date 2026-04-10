@@ -25,10 +25,12 @@ const DEFAULT_STATE = {
   largeOutputCount: 0,
   estimatedTokens:  0,
   lastCompactTurn:  0,
+  lastLeanTurn:     0,
   currentTddPhase:  null,
   sessionStartTime: null,
   warningHistory:   [],
   lastTestResult:   null,
+  _reductionPct:    0,
 };
 
 /**
@@ -37,14 +39,26 @@ const DEFAULT_STATE = {
  * 기존 파일에 필드가 누락된 경우 기본값으로 채워 반환한다 (merge).
  */
 function loadState() {
+  if (!fs.existsSync(STATE_FILE)) {
+    return { ...DEFAULT_STATE, sessionStartTime: new Date().toISOString() };
+  }
+
+  let raw;
   try {
-    if (fs.existsSync(STATE_FILE)) {
-      const parsed = JSON.parse(fs.readFileSync(STATE_FILE, "utf8"));
-      // 기본값과 병합 — 누락 필드 보완, 기존 값 유지
-      return { ...DEFAULT_STATE, ...parsed };
-    }
-  } catch (_) {}
-  return { ...DEFAULT_STATE, sessionStartTime: new Date().toISOString() };
+    raw = fs.readFileSync(STATE_FILE, "utf8");
+  } catch (err) {
+    process.stderr.write(`[state-utils] 상태 파일 읽기 실패: ${err.message}\n`);
+    return { ...DEFAULT_STATE, sessionStartTime: new Date().toISOString() };
+  }
+
+  try {
+    const parsed = JSON.parse(raw);
+    // 기본값과 병합 — 누락 필드 보완, 기존 값 유지
+    return { ...DEFAULT_STATE, ...parsed };
+  } catch (err) {
+    process.stderr.write(`[state-utils] 상태 파일 손상 — 초기화합니다: ${err.message}\n`);
+    return { ...DEFAULT_STATE, sessionStartTime: new Date().toISOString() };
+  }
 }
 
 /**

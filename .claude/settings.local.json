@@ -1,0 +1,85 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node --check hooks/scripts/state-utils.js)",
+      "Bash(node --check hooks/scripts/pre-edit-guard.js)",
+      "Bash(node --check hooks/scripts/context-watch.js)",
+      "Bash(node --check hooks/scripts/lean-detector.js)",
+      "Bash(node --check hooks/scripts/test-result-tracker.js)",
+      "Bash(node --check hooks/scripts/session-start.js)",
+      "Bash(node --check hooks/scripts/session-end.js)"
+    ]
+  },
+  "hooks": [
+    {
+      "description": "공포 결구 게이트 — Python 파일 수정 전 TDD 준수 확인",
+      "event": "PreToolUse",
+      "matcher": "tool_name in ['Write', 'Edit', 'MultiEdit'] and (tool_input.file_path ?? '') matches '.*\\.py$'",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "node hooks/scripts/pre-edit-guard.js",
+          "timeout": 5000
+        }
+      ]
+    },
+    {
+      "description": "공포 주두 게이트 — 모든 도구 사용 후 컨텍스트 감시",
+      "event": "PostToolUse",
+      "matcher": "tool_name in ['Read', 'Write', 'Edit', 'Bash', 'MultiEdit']",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "node hooks/scripts/context-watch.js",
+          "timeout": 5000
+        }
+      ]
+    },
+    {
+      "description": "공포 안쏠림 — 복잡도 선제 감지 (context-watch 이후 실행)",
+      "event": "PostToolUse",
+      "matcher": "tool_name in ['Read', 'Write', 'Edit', 'Bash', 'MultiEdit']",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "node hooks/scripts/lean-detector.js",
+          "timeout": 5000
+        }
+      ]
+    },
+    {
+      "description": "공포 첨차 게이트 — Bash 실행 후 테스트 실패 감지",
+      "event": "PostToolUse",
+      "matcher": "tool_name == 'Bash'",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "node hooks/scripts/test-result-tracker.js",
+          "timeout": 5000
+        }
+      ]
+    },
+    {
+      "description": "공포 세션 시작 — 이전 체크포인트 복원",
+      "event": "SessionStart",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "node hooks/scripts/session-start.js",
+          "timeout": 10000
+        }
+      ]
+    },
+    {
+      "description": "공포 세션 종료 — 체크포인트 자동 저장",
+      "event": "Stop",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "node hooks/scripts/session-end.js",
+          "timeout": 10000
+        }
+      ]
+    }
+  ]
+}

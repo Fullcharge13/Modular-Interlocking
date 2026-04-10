@@ -7,7 +7,7 @@
       "hooks": [
         {
           "type": "command",
-          "command": "node pre-edit-guard.js",
+          "command": "node hooks/scripts/pre-edit-guard.js",
           "timeout": 5000
         }
       ]
@@ -19,7 +19,19 @@
       "hooks": [
         {
           "type": "command",
-          "command": "node context-watch.js",
+          "command": "node hooks/scripts/context-watch.js",
+          "timeout": 5000
+        }
+      ]
+    },
+    {
+      "description": "공포 안쏠림 — 복잡도 선제 감지 (context-watch 이후 실행)",
+      "event": "PostToolUse",
+      "matcher": "tool_name in ['Read', 'Write', 'Edit', 'Bash', 'MultiEdit']",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "node hooks/scripts/lean-detector.js",
           "timeout": 5000
         }
       ]
@@ -31,7 +43,7 @@
       "hooks": [
         {
           "type": "command",
-          "command": "node test-result-tracker.js",
+          "command": "node hooks/scripts/test-result-tracker.js",
           "timeout": 5000
         }
       ]
@@ -42,7 +54,7 @@
       "hooks": [
         {
           "type": "command",
-          "command": "node session-start.js",
+          "command": "node hooks/scripts/session-start.js",
           "timeout": 10000
         }
       ]
@@ -53,7 +65,7 @@
       "hooks": [
         {
           "type": "command",
-          "command": "node session-end.js",
+          "command": "node hooks/scripts/session-end.js",
           "timeout": 10000
         }
       ]
